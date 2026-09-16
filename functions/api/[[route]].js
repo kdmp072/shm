@@ -1,6 +1,5 @@
 /* Cloudflare Pages Functions — SATU file untuk semua endpoint /api/*
  * Binding D1 bernama "DB" (diatur di dashboard: Pages → Settings → Functions → D1).
- *
  *   GET    /api/dates                  → daftar tanggal tersimpan
  *   GET    /api/bars?date=YYYY-MM-DD   → seluruh baris 1 tanggal
  *   GET    /api/bars?from=A&to=B       → rentang tanggal (maks 62 hari)

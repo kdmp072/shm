@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>IDX Screener — Ringkasan Saham Harian</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#0a0f1c; --bg2:#0d1526; --card:#121c31; --card2:#16223c;
+  --line:#233252; --txt:#e9eff8; --mut:#8ea2bd;
+  --up:#22c55e; --dn:#f43f5e; --acc:#fbbf24; --blue:#38bdf8; --vio:#a78bfa;
+  --r:16px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:radial-gradient(1200px 500px at 80% -10%,#16224a 0%,var(--bg) 55%) fixed,var(--bg);color:var(--txt);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:15px;line-height:1.5}
+.wrap{max-width:1080px;margin:0 auto;padding:12px 12px 110px}
+header.top{position:sticky;top:0;z-index:40;background:rgba(10,15,28,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.topin{max-width:1080px;margin:0 auto;padding:10px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.brand{font-weight:800;font-size:17px;letter-spacing:.2px;white-space:nowrap}
+.brand small{display:block;font-weight:500;font-size:11px;color:var(--mut);letter-spacing:.4px}
+.pill{font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);color:var(--mut);white-space:nowrap}
+.pill.on{color:#052e16;background:var(--up);border-color:var(--up);font-weight:700}
+.pill.off{color:#3b2b00;background:var(--acc);border-color:var(--acc);font-weight:700}
+.datenav{margin-left:auto;display:flex;align-items:center;gap:6px}
+.datenav select{background:var(--card);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:8px 6px;font-size:13px;max-width:150px}
+.iconbtn{background:var(--card);border:1px solid var(--line);color:var(--txt);border-radius:10px;min-width:40px;min-height:40px;font-size:16px;cursor:pointer}
+.iconbtn:active{transform:scale(.96)}
+.demobadge{font-size:11px;font-weight:800;color:#3b2b00;background:var(--acc);border-radius:6px;padding:2px 7px}
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:50;background:rgba(13,21,38,.96);backdrop-filter:blur(10px);
+  border-top:1px solid var(--line);display:flex;padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+nav.tabs button{flex:1;background:none;border:0;color:var(--mut);font-size:11px;font-weight:600;padding:8px 2px;border-radius:12px;cursor:pointer;min-height:56px}
+nav.tabs button .ic{display:block;font-size:21px;line-height:1.2}
+nav.tabs button.on{color:var(--acc);background:rgba(251,191,36,.08)}
+section.page{display:none;animation:fade .18s ease}
+section.page.on{display:block}
+@keyframes fade{from{opacity:.4;transform:translateY(4px)}to{opacity:1;transform:none}}
+.card{background:linear-gradient(180deg,var(--card2),var(--card));border:1px solid var(--line);border-radius:var(--r);padding:14px;margin:12px 0}
+.card h3{margin:0 0 10px;font-size:15px}
+.mut{color:var(--mut)} .small{font-size:12.5px} .tiny{font-size:11.5px}
+.pos{color:var(--up);font-weight:700} .neg{color:var(--dn);font-weight:700}
+.grid{display:grid;gap:10px}
+.g2{grid-template-columns:repeat(2,1fr)} .g3{grid-template-columns:repeat(3,1fr)} .g4{grid-template-columns:repeat(2,1fr)}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
+.stat .l{font-size:11.5px;color:var(--mut)} .stat .v{font-size:17px;font-weight:800;font-variant-numeric:tabular-nums}
+.tblwrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:rgba(0,0,0,.18)}
+table.tbl{width:100%;border-collapse:collapse;font-size:12.5px;min-width:640px}
+table.tbl.compact{min-width:520px}
+.tbl th{position:sticky;top:0;background:#1a2742;color:#c6d4ea;font-weight:700;text-align:right;padding:9px 8px;white-space:nowrap;cursor:default;user-select:none}
+.tbl th.l,.tbl td.l{text-align:left}
+.tbl th.sortable{cursor:pointer}
+.tbl td{padding:8px;border-top:1px solid #1c2947;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tbl td.code,.tbl th.code{position:sticky;left:0;background:#141f38;z-index:2;text-align:left}
+.tbl tbody tr{cursor:pointer}
+.tbl tbody tr:hover td{background:rgba(56,189,248,.07)}
+.tag{font-size:10.5px;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap}
+.t-up{background:rgba(34,197,94,.16);color:var(--up)} .t-dn{background:rgba(244,63,94,.16);color:var(--dn)}
+.t-flat{background:rgba(142,162,189,.16);color:var(--mut)} .t-acc{background:rgba(251,191,36,.16);color:var(--acc)}
+.t-blue{background:rgba(56,189,248,.14);color:var(--blue)} .t-vio{background:rgba(167,139,250,.16);color:var(--vio)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--line);background:var(--card2);color:var(--txt);
+  border-radius:12px;padding:11px 16px;font-size:14px;font-weight:700;cursor:pointer;min-height:46px}
+.btn:active{transform:scale(.98)}
+.btn.pri{background:linear-gradient(180deg,#fbbf24,#d99a06);border-color:#d99a06;color:#241a02}
+.btn.grn{background:linear-gradient(180deg,#22c55e,#15803d);border-color:#15803d;color:#04170b}
+.btn.ghost{background:transparent}
+.btn.sm{min-height:38px;padding:7px 12px;font-size:13px;border-radius:10px}
+.btn.block{width:100%}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap}
+input[type=text],input[type=number],input[type=date],select{background:#0d1730;border:1px solid var(--line);color:var(--txt);
+  border-radius:10px;padding:10px 12px;font-size:14px;min-height:44px;width:100%}
+input:focus,select:focus{outline:2px solid rgba(56,189,248,.5);border-color:var(--blue)}
+label.f{display:block;font-size:12px;color:var(--mut);margin:8px 0 4px}
+.rulechips{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 8px}
+.rulechip{flex:0 0 auto;border:1px solid var(--line);background:var(--card);border-radius:14px;padding:9px 13px;cursor:pointer;min-width:150px;text-align:left}
+.rulechip .t{font-weight:800;font-size:13.5px}
+.rulechip .c{font-size:20px;font-weight:800;color:var(--blue);font-variant-numeric:tabular-nums}
+.rulechip .d{font-size:10.5px;color:var(--mut)}
+.rulechip.on{border-color:var(--acc);background:rgba(251,191,36,.08)}
+.rulechip.on .c{color:var(--acc)}
+.drop{border:2px dashed #35507e;border-radius:var(--r);padding:26px 14px;text-align:center;background:rgba(56,189,248,.04);cursor:pointer}
+.drop.over{border-color:var(--acc);background:rgba(251,191,36,.07)}
+.prog{height:10px;background:#0d1730;border-radius:999px;overflow:hidden;border:1px solid var(--line)}
+.prog>div{height:100%;width:0;background:linear-gradient(90deg,var(--blue),var(--up));transition:width .2s}
+.histrow{display:flex;align-items:center;gap:8px;padding:9px 2px;border-top:1px solid #1c2947;font-size:13.5px}
+.histrow .dt{font-weight:800}
+.overlay{position:fixed;inset:0;z-index:80;background:rgba(3,6,14,.72);display:none;padding:0}
+.overlay.on{display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--bg2);border:1px solid var(--line);border-bottom:0;border-radius:18px 18px 0 0;width:100%;max-width:880px;
+  max-height:94vh;overflow-y:auto;padding:16px 14px 30px;animation:up .2s ease}
+@keyframes up{from{transform:translateY(30px);opacity:.5}to{transform:none;opacity:1}}
+.sticktop{position:sticky;top:-16px;background:var(--bg2);padding:10px 0;z-index:5;border-bottom:1px solid var(--line);margin:-16px -14px 12px;padding-left:14px;padding-right:14px}
+.empty{text-align:center;padding:38px 16px}
+.empty .big{font-size:52px}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
+.toolbar .grow{flex:1;min-width:150px}
+.pager{display:flex;gap:8px;align-items:center;justify-content:center;margin-top:10px;flex-wrap:wrap}
+.warn{background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.4);border-radius:12px;padding:10px 12px;font-size:13px;margin:10px 0}
+.err{background:rgba(244,63,94,.1);border:1px solid rgba(244,63,94,.4);border-radius:12px;padding:10px 12px;font-size:13px;margin:10px 0}
+.okk{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.4);border-radius:12px;padding:10px 12px;font-size:13px;margin:10px 0}
+footer.app{text-align:center;color:var(--mut);font-size:11.5px;padding:18px 0 6px}
+@media(min-width:840px){
+  .wrap{padding:16px 16px 60px}
+  nav.tabs{position:static;background:transparent;border:0;max-width:1080px;margin:10px auto 0;padding:0 16px;gap:8px}
+  nav.tabs button{flex:0 0 auto;min-height:42px;font-size:13.5px;padding:9px 18px;border:1px solid var(--line);background:var(--card)}
+  nav.tabs button .ic{display:inline;font-size:15px;margin-right:6px}
+  nav.tabs button.on{background:rgba(251,191,36,.1)}
+  .g4{grid-template-columns:repeat(4,1fr)}
+  .overlay.on{align-items:center;padding:20px}
+  .sheet{border-radius:18px;border:1px solid var(--line);max-height:88vh;padding:20px}
+  .sticktop{top:-20px;margin:-20px -20px 12px;padding-left:20px;padding-right:20px}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="topin">
+    <div class="brand">📈 IDX Screener<small>RINGKASAN SAHAM HARIAN</small></div>
+    <span class="pill off" id="dbPill">🟡 Lokal</span>
+    <div class="datenav">
+      <button class="iconbtn" id="prevDate" title="Tanggal sebelumnya">‹</button>
+      <select id="dateSel" title="Tanggal perdagangan"></select>
+      <button class="iconbtn" id="nextDate" title="Tanggal berikutnya">›</button>
+    </div>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="dash" class="on"><span class="ic">🏠</span>Ringkasan</button>
+  <button data-tab="data"><span class="ic">📊</span>Data</button>
+  <button data-tab="screen"><span class="ic">🎯</span>Screener</button>
+  <button data-tab="upload"><span class="ic">⬆️</span>Upload</button>
+</nav>
+
+<div class="wrap">
+
+  <section class="page on" id="p-dash"></section>
+  <section class="page" id="p-data"></section>
+  <section class="page" id="p-screen"></section>
+  <section class="page" id="p-upload"></section>
+
+  <footer class="app">Data: unduhan manual idx.co.id · Hitungan: PP/S1/R1, gap, foreign, blok order · v1.0</footer>
+</div>
+
+<div class="overlay" id="overlay"><div class="sheet" id="sheet"></div></div>
+
+<script>
+/* ============================================================
+   IDX Screener v1.0 — satu file, tanpa build.
+   Struktur: util → data contoh → state → API → parser →
+   indikator/aturan → render → upload → init.
+   Catatan: tidak ada akses DOM di level atas agar logika
+   inti bisa diuji dengan Node (lihat module.exports di bawah).
+   ============================================================ */
+'use strict';
+
+/* ---------- 1. UTIL ---------- */
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtN = (n, d=0) => (n==null || isNaN(n)) ? '—' : Number(n).toLocaleString('id-ID',{minimumFractionDigits:d,maximumFractionDigits:d});
+const fmtSigned = (n,d=0) => (n==null||isNaN(n)) ? '—' : (n>0?'+':'') + Number(n).toLocaleString('id-ID',{minimumFractionDigits:d,maximumFractionDigits:d});
+const fmtPct = (n,d=2) => (n==null||isNaN(n)) ? '—' : (n>0?'+':'') + Number(n).toLocaleString('id-ID',{minimumFractionDigits:d,maximumFractionDigits:d}) + '%';
+function fmtShort(n){
+  if(n==null||isNaN(n)) return '—';
+  const a=Math.abs(n), s=n<0?'-':'';
+  if(a>=1e12) return s+fmtN(a/1e12,2)+' T';
+  if(a>=1e9)  return s+fmtN(a/1e9,2)+' M';
+  if(a>=1e6)  return s+fmtN(a/1e6,1)+' jt';
+  if(a>=1e3)  return s+fmtN(a/1e3,1)+' rb';
+  return s+fmtN(a,0);
+}
+const BLN=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+const fmtDateID = ymd => { if(!ymd) return '—'; const p=ymd.split('-'); return p.length===3 ? `${+p[2]} ${BLN[+p[1]-1]} ${p[0]}` : ymd; };
+const cls = n => n==null||isNaN(n) ? '' : n>0 ? 'pos' : n<0 ? 'neg' : '';
+
+/* angka tangguh: terima number / string "1.234.567" / "203,6" / "1,234.56" */
+function parseNum(v){
+  if(v==null || v==='') return null;
+  if(typeof v==='number') return isNaN(v)?null:v;
+  let s=String(v).trim().replace(/\s/g,'').replace(/rp\.?/gi,'');
+  if(!s || s==='-' || s==='--') return null;
+  const hasDot=s.includes('.'), hasCom=s.includes(',');
+  if(hasDot && hasCom){ // pemisah terakhir = desimal
+    if(s.lastIndexOf(',')>s.lastIndexOf('.')) s=s.replace(/\./g,'').replace(',','.');
+    else s=s.replace(/,/g,'');
+  } else if(hasCom){
+    s = /,\d{1,2}$/.test(s) ? s.replace(/\./g,'').replace(',','.') : s.replace(/,/g,'');
+  } else if(hasDot){
+    s = (s.match(/\./g)||[]).length>1 || /\.\d{3}$/.test(s) ? s.replace(/\./g,'') : s;
+  }
+  const n=parseFloat(s);
+  return isNaN(n)?null:n;
+}
+
+const IDX_MONTH={jan:1,januari:1,feb:2,februari:2,mar:3,maret:3,apr:4,april:4,mei:5,jun:6,juni:6,
+  jul:7,juli:7,agu:8,agustus:8,agus:8,sep:9,sept:9,september:9,okt:10,oktober:10,oct:10,october:10,
+  nov:11,november:11,des:12,desember:12,dec:12,december:12,june:6,july:7,aug:8,august:8,may:5,march:3};
+/* tanggal IDX -> 'YYYY-MM-DD'. Terima Date / serial Excel / string */
+function parseIdxDate(v){
+  if(v==null||v==='') return null;
+  if(v instanceof Date && !isNaN(v)) return `${v.getFullYear()}-${String(v.getMonth()+1).padStart(2,'0')}-${String(v.getDate()).padStart(2,'0')}`;
+  if(typeof v==='number' && v>20000 && v<80000){
+    const d=new Date(Math.round((v-25569)*86400*1000));
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+  }
+  const s=String(v).trim();
+  let m=s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  m=s.match(/(\d{1,2})[\s\-\/.]+([A-Za-z]+)[\s\-\/.]+(\d{2,4})/);
+  if(m){ const mo=IDX_MONTH[m[2].toLowerCase()]; if(mo){ let y=+m[3]; if(y<100)y+=2000;
+    return `${y}-${String(mo).padStart(2,'0')}-${String(+m[1]).padStart(2,'0')}`; } }
+  m=s.match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
+  if(m){ let y=+m[3]; if(y<100)y+=2000; return `${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`; }
+  return null;
+}
+
+/* ---------- 2. DATA CONTOH (demo offline) ----------
+   12 emiten fiktif × 3 hari. Dirancang agar tiap aturan
+   screener + NEXT DAY + FREK terlihat cara kerjanya. */
+const DEMO_DATES=['2026-09-10','2026-09-11','2026-09-14'];
+/* [open,high,low,close, volume, nilai, freq, fbuy, fsell, nonregFreq] */
+const DEMO_RAW={
+'KOCI|Kopi Cinta Tbk.':        [[168,172,167,170, 20000000,3400000000,1500, 5000000,6000000,0],[172,178,171,176, 30000000,5200000000,2400, 9000000,5000000,1],[180,186,179,182, 45000000,8100000000,3200, 12000000,4000000,2]],
+'TERI|Teri Nasi Tbk.':         [[112,117,111,115, 40000000,4600000000,3000, 6000000,3000000,1],[116,122,114,120, 50000000,6000000000,3600, 7000000,2500000,2],[121,126,119,124, 60000000,7400000000,4100, 8000000,2000000,3]],
+'GULA|Gula Manis Tbk.':        [[866,878,860,870, 6000000,5200000000,1700, 1500000,1500000,0],[875,895,868,890, 8000000,7100000000,2100, 2000000,2500000,0],[920,945,915,935, 11000000,10200000000,2900, 3000000,1000000,1]],
+'LAMP|Lampu Terang Tbk.':      [[2485,2520,2475,2500, 1500000,3700000000,1400, 500000,450000,0],[2490,2510,2440,2450, 1800000,4400000000,1600, 600000,700000,0],[2440,2460,2380,2400, 2000000,4800000000,1800, 800000,500000,1]],
+'KOPI|Kopi Kapal Tbk.':        [[3175,3190,3140,3150, 2000000,6300000000,1900, 800000,850000,0],[3140,3160,3090,3100, 2200000,6800000000,2100, 900000,1000000,0],[3090,3110,3050,3060, 2000000,6100000000,2000, 1000000,600000,1]],
+'SOTO|Soto Ayam Tbk.':         [[296,303,294,300, 8000000,2400000000,1800, 1000000,1100000,0],[302,315,299,310, 10000000,3100000000,2200, 1500000,1400000,0],[312,330,308,325, 13000000,4200000000,2600, 2000000,1800000,0]],
+'DONAT|Donat Kentang Tbk.':    [[976,985,972,980, 3000000,2940000000,1200, 600000,620000,0],[982,995,978,990, 3500000,3460000000,1400, 700000,750000,0],[995,1010,990,1005, 4000000,4000000000,1600, 800000,900000,0]],
+'KERT|Kertasari Tbk.':         [[1225,1240,1218,1230, 1000000,1230000000,800, 200000,220000,0],[1240,1260,1235,1250, 1200000,1600000000,950, 300000,350000,0],[1290,1300,1260,1270, 1500000,1920000000,1100, 500000,300000,0]],
+'BECA|Becak Motor Tbk.':       [[746,755,742,750, 2500000,1870000000,1000, 500000,520000,0],[752,765,748,760, 3000000,2280000000,1200, 600000,650000,0],[775,780,755,762, 3200000,2450000000,1300, 900000,700000,0]],
+'BATA|Bata Merah Tbk.':        [[438,442,433,435, 4000000,1700000000,1500, 1000000,900000,0],[432,438,418,420, 5000000,2100000000,1900, 1200000,1500000,0],[415,418,388,392, 6000000,2400000000,2100, 1000000,3000000,0]],
+'MOBI|Mobil Listrik Tbk.':     [[5110,5170,5090,5150, 10000000,51000000000,6500, 3500000,3800000,0],[5160,5220,5140,5200, 12000000,62000000000,7200, 4000000,4500000,0],[5220,5300,5180,5280, 15000000,79000000000,8500, 6000000,4000000,0]],
+'JAMU|Jamu Sehat Tbk.':        [[150,152,147,148, 2800000,416000000,850, 450000,430000,0],[149,151,147,150, 2500000,375000000,800, 400000,420000,0],[150,152,149,150, 3000000,450000000,900, 500000,500000,0]],
+};
+function buildDemo(){
+  const out={};
+  DEMO_DATES.forEach((d,di)=>{
+    const rows=[];
+    for(const key of Object.keys(DEMO_RAW)){
+      const [code,name]=key.split('|');
+      const a=DEMO_RAW[key][di];
+      const prevClose = di===0 ? null : DEMO_RAW[key][di-1][3];
+      const r={code,name,remarks:'',prev:prevClose,open:a[0],high:a[1],low:a[2],close:a[3],
+        chg:prevClose==null?0:a[3]-prevClose,vol:a[4],val:a[5],freq:a[6],
+        offer:null,offerVol:null,bid:null,bidVol:null,listed:null,tradeable:null,weight:null,
+        fsell:a[8],fbuy:a[7],nrVol:null,nrVal:null,nrFreq:a[9],idxInd:null,first:a[0]};
+      if(di===0){ r.prev=a[3]; r.chg=0; } // hari pertama demo: prev=close (netral)
+      rows.push(r);
+    }
+    out[d]={rows,source:'Data contoh (demo)',demo:true};
+  });
+  return out;
+}
+
+/* ---------- 3. STATE ---------- */
+const S={
+  days:{},            // tanggal -> {rows, source, demo}
+  remote:[],          // daftar tanggal di server yg belum dimuat
+  active:null, tab:'dash', db:'unknown',
+  rule:'SA', page:0, pageSize:100, q:'', sort:{k:'code',d:1}, mode:'ringkas',
+  screenSort:{k:'val',d:-1},
+  th:{ SA:{maxPrice:200}, SD:{maxPrice:500,minChg:1,minVal:1500000000},
+       SE:{maxPct:-3,minPct:-50,maxOpen:500}, SF:{minGap:1} },
+  pending:null,
+};
+const orderDates=()=>Object.keys(S.days).sort();
+const prevDateOf=d=>{const o=orderDates();const i=o.indexOf(d);return i>0?o[i-1]:null;};
+const nextDateOf=d=>{const o=orderDates();const i=o.indexOf(d);return i>=0&&i<o.length-1?o[i+1]:null;};
+
+/* ---------- 4. API (D1 via Pages Functions) ---------- */
+async function api(path,opt={}){
+  const c=new AbortController(); const t=setTimeout(()=>c.abort(),15000);
+  try{
+    const r=await fetch(path,{...opt,signal:c.signal,headers:{'Content-Type':'application/json',...(opt.headers||{})}});
+    clearTimeout(t);
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return await r.json();
+  }catch(e){ clearTimeout(t); throw e; }
+}
+
+/* ---------- 5. PARSER XLSX IDX ---------- */
+const HMAP={
+  'kodesaham':'code','kode':'code','code':'code','ticker':'code',
+  'namaperusahaan':'name','nama':'name','name':'name','emiten':'name',
+  'remarks':'remarks','remark':'remarks',
+  'sebelumnya':'prev','prev':'prev','previous':'prev',
+  'openprice':'open','open':'open','pembukaan':'open',
+  'tanggalperdaganganterakhir':'tdate','tanggalperdagangan':'tdate','tanggal':'tdate','date':'tdate','tgl':'tdate',
+  'firsttrade':'first','first':'first',
+  'tertinggi':'high','high':'high','max':'high',
+  'terendah':'low','low':'low','min':'low',
+  'penutupan':'close','close':'close','closing':'close',
+  'selisih':'chg','change':'chg',
+  'volume':'vol','vol':'vol',
+  'nilai':'val','value':'val','nilaitransaksi':'val',
+  'frekuensi':'freq','frequency':'freq','frekwensi':'freq',
+  'indexindividual':'idxind','index':'idxind',
+  'offer':'offer',
+  'offervolume':'offerVol','voloffer':'offerVol',
+  'bid':'bid',
+  'bidvolume':'bidVol','volbid':'bidVol',
+  'listedshares':'listed',
+  'tradebleshares':'tradeable','tradeableshares':'tradeable',
+  'weightforindex':'weight','weight':'weight',
+  'foreignsell':'fsell','jualasing':'fsell',
+  'foreignbuy':'fbuy','beliasing':'fbuy',
+  'nonregularvolume':'nrVol','nonregvolume':'nrVol',
+  'nonregularvalue':'nrVal','nonregvalue':'nrVal',
+  'nonregularfrequency':'nrFreq','nonregfrequency':'nrFreq','nonregfreq':'nrFreq',
+};
+const normH=h=>String(h??'').toLowerCase().replace(/[^a-z]/g,'');
+/* arrays: hasil sheet_to_json(header:1). Murni & testable. */
+function normalizeFromArrays(arrays){
+  const warns=[];let hi=-1,cols={};
+  for(let i=0;i<Math.min(arrays.length,10);i++){
+    const row=arrays[i]||[];const m={};let hits=0;
+    row.forEach((c,ci)=>{const k=HMAP[normH(c)];if(k){m[ci]=k;hits++;}});
+    if(m && Object.values(m).includes('code') && hits>=4){hi=i;cols=m;break;}
+  }
+  if(hi<0) return {rows:[],date:null,errors:['Baris header tidak ditemukan. Pastikan file adalah Ringkasan Saham IDX (ada kolom "Kode Saham").'],warns};
+  const need=['prev','open','high','low','close'];
+  const missing=need.filter(k=>!Object.values(cols).includes(k));
+  if(missing.length) warns.push('Kolom tidak ditemukan: '+missing.join(', ')+' — turunannya akan kosong.');
+  const rows=[];let date=null;const tcol=Object.keys(cols).find(c=>cols[c]==='tdate');
+  for(let i=hi+1;i<arrays.length;i++){
+    const a=arrays[i]||[];
+    const code=String(a[Object.keys(cols).find(c=>cols[c]==='code')]??'').trim().toUpperCase();
+    if(!code) continue;
+    const g=k=>{const ci=Object.keys(cols).find(c=>cols[c]===k);return ci==null?null:a[+ci];};
+    if(date==null && tcol!=null){const d=parseIdxDate(a[+tcol]);if(d)date=d;}
+    const r={code,
+      name:String(g('name')??'').trim(),remarks:String(g('remarks')??'').trim(),
+      prev:parseNum(g('prev')),open:parseNum(g('open')),first:parseNum(g('first')),
+      high:parseNum(g('high')),low:parseNum(g('low')),close:parseNum(g('close')),
+      chg:parseNum(g('chg')),vol:parseNum(g('vol')),val:parseNum(g('val')),freq:parseNum(g('freq')),
+      offer:parseNum(g('offer')),offerVol:parseNum(g('offerVol')),bid:parseNum(g('bid')),bidVol:parseNum(g('bidVol')),
+      listed:parseNum(g('listed')),tradeable:parseNum(g('tradeable')),weight:parseNum(g('weight')),
+      fsell:parseNum(g('fsell')),fbuy:parseNum(g('fbuy')),
+      nrVol:parseNum(g('nrVol')),nrVal:parseNum(g('nrVal')),nrFreq:parseNum(g('nrFreq')),
+      idxInd:parseNum(g('idxind'))};
+    if(r.chg==null && r.close!=null && r.prev!=null) r.chg=r.close-r.prev;
+    rows.push(r);
+  }
+  return {rows,date,errors:[],warns};
+}
+
+/* ---------- 6. INDIKATOR & ATURAN SCREENER ---------- */
+function enrich(r){
+  const {prev,open,high,low,close}=r;
+  r._pp=(high!=null&&low!=null&&close!=null)?(high+low+close)/3:null;
+  r._s1=(r._pp!=null&&high!=null)?2*r._pp-high:null;
+  r._r1=(r._pp!=null&&low!=null)?2*r._pp-low:null;
+  r._upPP=(close!=null&&r._pp!=null)?close>r._pp:null;   // AG: C>PP
+  r._lwPP=(low!=null&&r._pp!=null)?low<r._pp:null;       // AH: L<PP
+  r._cross=(r._upPP&&r._lwPP)?true:false;                // AI: L<PP<C
+  r._pct=(close!=null&&prev)?(close-prev)/prev*100:null;
+  r._gap=(open!=null&&prev)?(open-prev)/prev*100:null;
+  r._netf=(r.fbuy!=null||r.fsell!=null)?(r.fbuy||0)-(r.fsell||0):null;
+  r._fb=(r.fbuy!=null&&r.fsell!=null)?r.fbuy>r.fsell:null;
+  r._block=(r.nrFreq||0)>=1;
+  if(r._gap!=null&&open!=null&&close!=null&&low!=null&&prev){
+    r._gapClose = r._gap>0 ? (low<=prev) : (r._gap<0 ? (high>=prev) : null);
+    r._sfClass = close>open?'KUAT':(close<open?'MELEMAH':'SEJAJAR');
+  } else r._sfClass=null;
+  return r;
+}
+/* ctx: {prev: baris T-1 kode yg sama} */
+const RULES={
+  SA:{name:'Asing + Blok < 200',desc:'FB > FS · Close < 200 · Blok ≥ 1',
+      test:(r,T)=>r._fb===true&&r.close!=null&&r.close<T.maxPrice&&r._block},
+  SB:{name:'Asing + Naik + Blok',desc:'FB > FS · Naik · Blok ≥ 1',
+      test:(r)=>r._fb===true&&(r.chg||0)>0&&r._block},
+  SC:{name:'Asing + Turun + Blok',desc:'FB > FS · Turun/tetap · Blok ≥ 1',
+      test:(r)=>r._fb===true&&(r.chg||0)<=0&&r._block},
+  SD:{name:'Cross-Up PP',desc:'Low<PP<Close · C<500 · Δ>1 · Nilai>1,5M · naik vs kemarin',
+      test:(r,T,ctx)=>r._cross&&r.close!=null&&r.close<T.maxPrice&&(r.chg||0)>T.minChg
+        &&(r.val||0)>T.minVal&&ctx.prev!=null&&(ctx.prev.val||0)>0&&(r.val>ctx.prev.val)},
+  SE:{name:'Minus Dalam',desc:'% −50..−3 · Open < 500',
+      test:(r,T)=>r._pct!=null&&r._pct<T.maxPct&&r._pct>T.minPct&&r.open!=null&&r.open<T.maxOpen},
+  SF:{name:'Gap Up + Asing',desc:'Gap ≥ ambang · FB > FS',
+      test:(r,T)=>r._gap!=null&&r._gap>=T.minGap&&r._fb===true},
+};
+function runRule(id,date){
+  const day=S.days[date];if(!day)return[];
+  const pd=prevDateOf(date);
+  const pmap={};
+  if(pd&&S.days[pd])S.days[pd].rows.forEach(r=>pmap[r.code]=r);
+  const T=S.th[id]||{};
+  return day.rows.map(enrich).filter(r=>{try{return RULES[id].test(r,T,{prev:pmap[r.code]||null});}catch(e){return false;}});
+}
+function nextInfo(code,date){
+  const nd=nextDateOf(date);
+  if(!nd||!S.days[nd])return null;
+  const cur=(S.days[date].rows.find(r=>r.code===code));
+  const nx=S.days[nd].rows.find(r=>r.code===code);
+  if(!cur||!nx||nx.close==null||cur.close==null)return{date:nd,none:true};
+  const d=nx.close-cur.close;
+  return{date:nd,open:nx.open,close:nx.close,pct:d/cur.close*100,label:d>0?'NAIK':d<0?'TURUN':'TETAP'};
+}
+function freqOf(id,code,date){
+  const o=orderDates().slice(-20);let n=0;
+  for(const d of o){ if(runRule(id,d).some(r=>r.code===code))n++; }
+  return{n,of:o.length};
+}
+
+/* ---------- 7. RENDER: KERANGKA ---------- */
+function setTab(t){
+  S.tab=t;
+  document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));
+  document.querySelectorAll('section.page').forEach(p=>p.classList.remove('on'));
+  document.getElementById('p-'+t).classList.add('on');
+  render();
+}
+function ensureActive(){
+  const o=orderDates();
+  if(!o.length){S.active=null;return;}
+  if(!S.active||!S.days[S.active])S.active=o[o.length-1];
+}
+function renderDateNav(){
+  const sel=document.getElementById('dateSel');
+  const o=orderDates().slice().reverse();
+  sel.innerHTML=o.map(d=>`<option value="${d}"${d===S.active?' selected':''}>${fmtDateID(d)}</option>`).join('')||'<option>—</option>';
+}
+function renderPill(){
+  const p=document.getElementById('dbPill');
+  if(S.db==='on'){p.className='pill on';p.textContent='🟢 Database';}
+  else if(S.db==='off'){p.className='pill off';p.textContent='🟡 Lokal';}
+  else{p.className='pill';p.textContent='…';}
+}
+function render(){ensureActive();renderDateNav();renderPill();
+  ({dash:renderDash,data:renderData,screen:renderScreen,upload:renderUpload})[S.tab]();}
+function emptyState(){
+  return `<div class="card empty"><div class="big">📥</div>
+    <h3>Belum ada data</h3>
+    <p class="mut">Unggah file <b>Ringkasan Saham (.xlsx)</b> dari idx.co.id,<br>atau coba dulu dengan data contoh.</p>
+    <div class="btnrow" style="justify-content:center">
+      <button class="btn pri" onclick="setTab('upload')">⬆️ Upload File</button>
+      <button class="btn" onclick="loadDemo()">✨ Data Contoh</button>
+    </div></div>`;
+}
+
+/* ---------- 8. RENDER: RINGKASAN ---------- */
+function renderDash(){
+  const el=document.getElementById('p-dash');
+  if(!S.active){el.innerHTML=emptyState();return;}
+  const d=S.active,rows=S.days[d].rows.map(enrich);
+  let up=0,dn=0,fl=0,totVal=0,netF=0;
+  rows.forEach(r=>{const c=r.chg||0;if(c>0)up++;else if(c<0)dn++;else fl++;
+    if(r.val)totVal+=r.val;if(r._netf!=null)netF+=r._netf;});
+  const counts={};for(const id of Object.keys(RULES))counts[id]=runRule(id,d).length;
+  const by=(f)=>rows.filter(r=>f(r)).sort((a,b)=>(b.val||0)-(a.val||0)).slice(0,5);
+  const topUp=[...rows].filter(r=>r._pct!=null).sort((a,b)=>b._pct-a._pct).slice(0,5);
+  const topDn=[...rows].filter(r=>r._pct!=null).sort((a,b)=>a._pct-b._pct).slice(0,5);
+  const topVal=[...rows].sort((a,b)=>(b.val||0)-(a.val||0)).slice(0,5);
+  const topNF=[...rows].filter(r=>r._netf!=null).sort((a,b)=>b._netf-a._netf).slice(0,5);
+  const li=r=>`<tr onclick="openDetail('${r.code}')"><td class="code"><b>${esc(r.code)}</b></td><td>${fmtN(r.close)}</td><td class="${cls(r.chg)}">${fmtSigned(r.chg)}</td><td class="${cls(r._pct)}">${fmtPct(r._pct,1)}</td></tr>`;
+  const mini=(t,arr)=>`<div class="card"><h3>${t}</h3><div class="tblwrap"><table class="tbl compact">
+    <tr><th class="code l">Kode</th><th>Close</th><th>+/-</th><th>%</th></tr>${arr.map(li).join('')||'<tr><td colspan=4 class="mut">—</td></tr>'}</table></div></div>`;
+  el.innerHTML=`
+  <div class="card"><h3>📅 ${fmtDateID(d)} ${S.days[d].demo?'<span class="demobadge">DEMO</span>':''}</h3>
+    <div class="grid g4">
+      <div class="stat"><div class="l">Emiten</div><div class="v">${fmtN(rows.length)}</div></div>
+      <div class="stat"><div class="l">🟢 Naik / 🔴 Turun / ⚪ Tetap</div><div class="v"><span class="pos">${up}</span> / <span class="neg">${dn}</span> / ${fl}</div></div>
+      <div class="stat"><div class="l">Total Nilai</div><div class="v">Rp${fmtShort(totVal)}</div></div>
+      <div class="stat"><div class="l">Net Foreign</div><div class="v ${cls(netF)}">${fmtShort(netF)}</div></div>
+    </div>
+    <p class="tiny mut" style="margin:8px 0 0">Sumber: ${esc(S.days[d].source||'—')}</p></div>
+  <div class="card"><h3>🎯 Hasil Screener Hari Ini</h3>
+    <div class="grid g3">${Object.keys(RULES).map(id=>`
+      <div class="stat" style="cursor:pointer" onclick="goRule('${id}')">
+        <div class="l">${RULES[id].name}</div><div class="v" style="color:var(--acc)">${counts[id]}</div>
+        <div class="tiny mut">${RULES[id].desc}</div></div>`).join('')}</div></div>
+  ${mini('🚀 Top Naik',topUp)}${mini('🔻 Top Turun',topDn)}
+  ${mini('💰 Top Nilai Transaksi',topVal)}${mini('🌏 Top Net Foreign Buy',topNF)}`;
+}
+function goRule(id){S.rule=id;S.screenSort={k:'val',d:-1};setTab('screen');}
+
+/* ---------- 9. RENDER: DATA ---------- */
+const DCOLS=[
+  ['code','Kode',1],['name','Nama',1],['prev','Prev'],['open','Open'],['high','High'],['low','Low'],
+  ['close','Close'],['chg','+/-'],['_pct','%Chg'],['_gap','Gap%'],['vol','Volume'],['val','Nilai'],
+  ['freq','Freq'],['_pp','PP'],['_s1','S1'],['_r1','R1'],['_upPP','C>PP'],['_lwPP','L<PP'],
+  ['fbuy','FBuy'],['fsell','FSell'],['_netf','NetF'],['nrFreq','Blok']];
+const RINGKAS=new Set(['code','close','chg','_pct','_gap','val','_netf','_pp','_s1','_r1']);
+function cellVal(r,k){
+  let v=r[k];
+  if(k==='_upPP'||k==='_lwPP')return v==null?'—':(v?'<span class="tag t-up">YA</span>':'');
+  if(k==='_pct'||k==='_gap')return `<span class="${cls(v)}">${fmtPct(v)}</span>`;
+  if(k==='chg')return `<span class="${cls(v)}">${fmtSigned(v)}</span>`;
+  if(k==='nrFreq')return (v||0)>=1?`<span class="tag t-acc">${fmtN(v)}</span>`:'0';
+  if(k==='code')return `<b>${esc(v)}</b>`;
+  if(k==='name')return esc(v);
+  if(typeof v==='number')return fmtN(v);
+  return v==null?'—':esc(v);
+}
+function renderData(){
+  const el=document.getElementById('p-data');
+  if(!S.active){el.innerHTML=emptyState();return;}
+  let rows=S.days[S.active].rows.map(enrich);
+  const q=S.q.trim().toLowerCase();
+  if(q)rows=rows.filter(r=>r.code.toLowerCase().includes(q)||(r.name||'').toLowerCase().includes(q));
+  const {k,d}=S.sort;
+  rows.sort((a,b)=>{const x=a[k],y=b[k];
+    if(x==null&&y==null)return 0;if(x==null)return 1;if(y==null)return -1;
+    return (typeof x==='string'?x.localeCompare(y):x-y)*d;});
+  const cols=DCOLS.filter(c=>S.mode==='lengkap'||RINGKAS.has(c[0]));
+  const ps=S.pageSize,total=rows.length,pages=Math.max(1,Math.ceil(total/(ps||total)));
+  if(S.page>=pages)S.page=pages-1;
+  const view=ps?rows.slice(S.page*ps,S.page*ps+ps):rows;
+  el.innerHTML=`
+  <div class="card"><h3>📊 Data ${fmtDateID(S.active)} <span class="mut small">(${fmtN(total)} emiten)</span></h3>
+    <div class="toolbar">
+      <div class="grow"><input type="text" id="q" placeholder="🔍 Cari kode / nama…" value="${esc(S.q)}"></div>
+      <button class="btn sm ${S.mode==='ringkas'?'pri':''}" onclick="S.mode='ringkas';S.page=0;render()">Ringkas</button>
+      <button class="btn sm ${S.mode==='lengkap'?'pri':''}" onclick="S.mode='lengkap';S.page=0;render()">Lengkap</button>
+    </div>
+    <div class="toolbar">
+      <select id="ps" style="max-width:150px">
+        ${[50,100,250].map(n=>`<option value="${n}"${ps===n?' selected':''}>${n}/hal</option>`).join('')}
+        <option value="0"${!ps?' selected':''}>Semua</option></select>
+      <button class="btn sm ghost" onclick="exportCSV('data')">⬇️ CSV</button>
+      <span class="tiny mut">Ketuk judul kolom untuk sortir · ketuk baris utk detail</span>
+    </div>
+    <div class="tblwrap"><table class="tbl"><tr>${cols.map(c=>
+      `<th class="${c[2]?'l':''}${c[0]==='code'?' code':''} sortable" onclick="sortBy('${c[0]}')">${c[1]}${S.sort.k===c[0]?(S.sort.d===1?' ▲':' ▼'):''}</th>`).join('')}</tr>
+      ${view.map(r=>`<tr onclick="openDetail('${r.code}')">${cols.map(c=>`<td class="${c[2]?'l':''}${c[0]==='code'?' code':''}">${cellVal(r,c[0])}</td>`).join('')}</tr>`).join('')||'<tr><td class="mut">Tidak ada hasil.</td></tr>'}
+    </table></div>
+    ${ps?`<div class="pager"><button class="btn sm" onclick="S.page=Math.max(0,S.page-1);render()" ${S.page===0?'disabled':''}>‹</button>
+      <span class="small mut">Hal ${S.page+1}/${pages}</span>
+      <button class="btn sm" onclick="S.page=Math.min(${pages-1},S.page+1);render()" ${S.page>=pages-1?'disabled':''}>›</button></div>`:''}
+  </div>`;
+  const qi=document.getElementById('q');
+  qi.addEventListener('input',()=>{S.q=qi.value;S.page=0;
+    clearTimeout(window._qt);window._qt=setTimeout(renderData,350);});
+  document.getElementById('ps').addEventListener('change',e=>{S.pageSize=+e.target.value;S.page=0;render();});
+}
+function sortBy(k){if(S.sort.k===k)S.sort.d*=-1;else S.sort={k,d:1};S.page=0;render();}
+
+/* ---------- 10. RENDER: SCREENER ---------- */
+const THDEF={
+  SA:[['maxPrice','Maks Close',1]],SB:[],SC:[],
+  SD:[['maxPrice','Maks Close',1],['minChg','Min Selisih (poin)',1],['minVal','Min Nilai (Rp)',1000000000]],
+  SE:[['maxPct','Maks % (mis -3)',1],['minPct','Min % (mis -50)',1],['maxOpen','Maks Open',1]],
+  SF:[['minGap','Min Gap %',0.1]],
+};
+function renderScreen(){
+  const el=document.getElementById('p-screen');
+  if(!S.active){el.innerHTML=emptyState();return;}
+  const d=S.active,counts={};
+  for(const id of Object.keys(RULES))counts[id]=runRule(id,d).length;
+  let res=runRule(S.rule,d);
+  const {k,dd}= {k:S.screenSort.k,dd:S.screenSort.d};
+  res.sort((a,b)=>{const x=a[k],y=b[k];
+    if(x==null&&y==null)return 0;if(x==null)return 1;if(y==null)return -1;
+    return (typeof x==='string'?String(x).localeCompare(String(y)):x-y)*dd;});
+  const extraCol={SA:'Blok',SB:'Blok',SC:'Blok',SD:'Nilai T−1',SE:'Open',SF:'Gap / Kelas'}[S.rule];
+  const extraVal=r=>{
+    if(S.rule==='SA'||S.rule==='SB'||S.rule==='SC')return `<span class="tag t-acc">${fmtN(r.nrFreq||0)}</span>`;
+    if(S.rule==='SD'){const pd=prevDateOf(d);const p=pd&&S.days[pd]?S.days[pd].rows.find(x=>x.code===r.code):null;
+      return p&&p.val?fmtShort(p.val):'—';}
+    if(S.rule==='SE')return fmtN(r.open);
+    const gc=r._sfClass==='KUAT'?'t-up':r._sfClass==='MELEMAH'?'t-dn':'t-flat';
+    return `<span class="${cls(r._gap)}">${fmtPct(r._gap)}</span> <span class="tag ${gc}">${r._sfClass||'—'}</span>${r._gapClose?'<br><span class="tag t-vio">TERTUTUP</span>':''}`;
+  };
+  const nx=r=>{const n=nextInfo(r.code,d);
+    if(!n)return'<span class="mut">—</span>';
+    if(n.none)return`<span class="tiny mut">${fmtDateID(n.date)}: emiten tdk ada</span>`;
+    const t=n.label==='NAIK'?'t-up':n.label==='TURUN'?'t-dn':'t-flat';
+    return `${fmtN(n.close)} <span class="${cls(n.pct)}">${fmtPct(n.pct,1)}</span><br><span class="tag ${t}">${n.label}</span>`;};
+  const thInputs=(THDEF[S.rule]||[]).map(([key,lab])=>`
+    <div style="min-width:120px;flex:1"><label class="f">${lab}</label>
+    <input type="number" step="any" value="${S.th[S.rule][key]}" onchange="S.th['${S.rule}']['${key}']=+this.value||0;render()"></div>`).join('');
+  el.innerHTML=`
+  <div class="card"><h3>🎯 Screener — ${fmtDateID(d)}</h3>
+    <div class="rulechips">${Object.keys(RULES).map(id=>`
+      <div class="rulechip${id===S.rule?' on':''}" onclick="S.rule='${id}';S.screenSort={k:'val',d:-1};render()">
+        <div class="t">${id} · ${RULES[id].name}</div><div class="c">${counts[id]}</div><div class="d">${RULES[id].desc}</div>
+      </div>`).join('')}</div>
+    ${thInputs?`<div class="toolbar">${thInputs}<button class="btn sm ghost" onclick="resetTh('${S.rule}')">↺ Reset</button></div>`:''}
+    <div class="toolbar"><button class="btn sm ghost" onclick="exportCSV('screen')">⬇️ CSV Hasil</button>
+      <span class="tiny mut">${res.length} hasil · NEXT = T+1 (${nextDateOf(d)?fmtDateID(nextDateOf(d)):'belum ada'}) · FREK dari ${freqOf(S.rule,'~',d).of} tgl termuat</span></div>
+    <div class="tblwrap"><table class="tbl"><tr>
+      <th class="code l sortable" onclick="ssort('code')">Kode</th>
+      <th class="l sortable" onclick="ssort('close')">Close</th>
+      <th class="sortable" onclick="ssort('chg')">+/-</th>
+      <th class="sortable" onclick="ssort('_pct')">%</th>
+      <th class="sortable" onclick="ssort('val')">Nilai</th>
+      <th class="sortable" onclick="ssort('_netf')">NetF</th>
+      <th>${extraCol}</th><th>NEXT DAY</th><th class="sortable" onclick="ssort('_frek')">FREK</th></tr>
+      ${res.map(r=>{const f=freqOf(S.rule,r.code,d);r._frek=f.n;return `<tr onclick="openDetail('${r.code}')">
+        <td class="code"><b>${esc(r.code)}</b><br><span class="tiny mut">${esc((r.name||'').slice(0,22))}</span></td>
+        <td class="l">${fmtN(r.close)}</td><td class="${cls(r.chg)}">${fmtSigned(r.chg)}</td>
+        <td class="${cls(r._pct)}">${fmtPct(r._pct)}</td><td>${fmtShort(r.val)}</td>
+        <td class="${cls(r._netf)}">${fmtShort(r._netf)}</td><td>${extraVal(r)}</td><td>${nx(r)}</td>
+        <td><span class="tag t-blue">${f.n}×</span></td></tr>`;}).join('')||'<tr><td colspan="9" class="mut">Tidak ada hasil. Coba longgarkan ambang batas.</td></tr>'}
+    </table></div></div>`;
+}
+function ssort(k){if(S.screenSort.k===k)S.screenSort.d*=-1;else S.screenSort={k,d:-1};render();}
+function resetTh(id){S.th={SA:{maxPrice:200},SD:{maxPrice:500,minChg:1,minVal:1500000000},SE:{maxPct:-3,minPct:-50,maxOpen:500},SF:{minGap:1}};render();}
+
+/* ---------- 11. DETAIL EMITEN ---------- */
+function openDetail(code){
+  const o=orderDates().slice().reverse();
+  const hist=o.map(d=>({d,r:(S.days[d].rows.find(x=>x.code===code))})).filter(x=>x.r).map(x=>({d:x.d,r:enrich(x.r)}));
+  if(!hist.length)return;
+  const last=hist[0].r;
+  let upStreak=0;for(const h of hist){if((h.r.chg||0)>0)upStreak++;else break;}
+  let fStreak=0;for(const h of hist){if((h.r._netf||0)>0)fStreak++;else break;}
+  const inRules=S.active?Object.keys(RULES).filter(id=>runRule(id,S.active).some(r=>r.code===code)):[];
+  document.getElementById('sheet').innerHTML=`
+    <div class="sticktop"><div style="display:flex;align-items:center;gap:10px">
+      <div><b style="font-size:17px">${esc(code)}</b> <span class="mut small">${esc(last.name||'')}</span><br>
+      <span style="font-size:20px;font-weight:800">${fmtN(last.close)}</span>
+      <span class="${cls(last.chg)}">${fmtSigned(last.chg)} (${fmtPct(last._pct)})</span></div>
+      <button class="btn sm" style="margin-left:auto" onclick="closeDetail()">✕ Tutup</button></div></div>
+    <div class="grid g3">
+      <div class="stat"><div class="l">PP / S1 / R1</div><div class="v" style="font-size:14px">${fmtN(last._pp)} / ${fmtN(last._s1)} / ${fmtN(last._r1)}</div></div>
+      <div class="stat"><div class="l">Gap hari ini</div><div class="v ${cls(last._gap)}">${fmtPct(last._gap)}</div></div>
+      <div class="stat"><div class="l">Net Foreign</div><div class="v ${cls(last._netf)}">${fmtShort(last._netf)}</div></div>
+      <div class="stat"><div class="l">Streak naik</div><div class="v">${upStreak} hari</div></div>
+      <div class="stat"><div class="l">Streak net foreign +</div><div class="v">${fStreak} hari</div></div>
+      <div class="stat"><div class="l">Masuk screener (${S.active?fmtDateID(S.active):'—'})</div>
+        <div class="v" style="font-size:13px">${inRules.length?inRules.map(i=>`<span class="tag t-acc">${i}</span>`).join(' '):'<span class="mut">—</span>'}</div></div>
+    </div>
+    <h3 style="margin:14px 0 8px">Riwayat (${hist.length} tanggal termuat)</h3>
+    <div class="tblwrap"><table class="tbl"><tr><th class="l">Tgl</th><th>O</th><th>H</th><th>L</th><th>C</th><th>%</th><th>Gap%</th><th>Nilai</th><th>NetF</th><th>PP</th><th>S1</th><th>R1</th></tr>
+    ${hist.map(h=>`<tr><td class="l">${fmtDateID(h.d)}</td><td>${fmtN(h.r.open)}</td><td>${fmtN(h.r.high)}</td><td>${fmtN(h.r.low)}</td>
+      <td><b>${fmtN(h.r.close)}</b></td><td class="${cls(h.r._pct)}">${fmtPct(h.r._pct)}</td>
+      <td class="${cls(h.r._gap)}">${fmtPct(h.r._gap)}</td><td>${fmtShort(h.r.val)}</td>
+      <td class="${cls(h.r._netf)}">${fmtShort(h.r._netf)}</td><td>${fmtN(h.r._pp)}</td><td>${fmtN(h.r._s1)}</td><td>${fmtN(h.r._r1)}</td></tr>`).join('')}
+    </table></div>`;
+  document.getElementById('overlay').classList.add('on');
+}
+function closeDetail(){document.getElementById('overlay').classList.remove('on');}
+
+/* ---------- 12. RENDER: UPLOAD ---------- */
+function renderUpload(){
+  const el=document.getElementById('p-upload');
+  const o=orderDates().slice().reverse();
+  el.innerHTML=`
+  <div class="card"><h3>⬆️ Upload Ringkasan Saham IDX (.xlsx)</h3>
+    <p class="small mut">Unduh file dari idx.co.id → seret ke bawah / ketuk untuk pilih. Data <b>menumpuk per tanggal</b> otomatis.</p>
+    <div class="drop" id="drop">📂 <b>Ketuk / seret file .xlsx ke sini</b><br><span class="small mut">format: Ringkasan Saham IDX</span>
+      <input type="file" id="file" accept=".xlsx,.xls,.csv" style="display:none"></div>
+    <div id="upmsg"></div><div id="upprev"></div></div>
+  <div class="card"><h3>🗂️ Riwayat Tanggal (${o.length} termuat${S.remote.length?` · ${S.remote.length} di server`:''})</h3>
+    <div class="btnrow"><button class="btn sm" onclick="loadDemo()">✨ Muat data contoh</button>
+    ${S.db==='on'?'<button class="btn sm ghost" onclick="refreshRemote(true)">↻ Muat semua tanggal server</button>':''}</div>
+    ${o.map(d=>`<div class="histrow"><span class="dt">${fmtDateID(d)}</span>
+      ${S.days[d].demo?'<span class="demobadge">DEMO</span>':''}
+      <span class="mut small">${fmtN(S.days[d].rows.length)} emiten</span>
+      <span style="margin-left:auto"></span>
+      <button class="btn sm ghost" onclick="S.active='${d}';setTab('dash')">Buka</button>
+      <button class="btn sm ghost" onclick="exportCSV('data','${d}')">CSV</button>
+      <button class="btn sm ghost" onclick="delDate('${d}')">🗑️</button></div>`).join('')||'<p class="mut">Belum ada.</p>'}
+    ${S.remote.map(r=>`<div class="histrow"><span class="dt">${fmtDateID(r.trade_date)}</span>
+      <span class="tag t-blue">SERVER</span><span class="mut small">${fmtN(r.row_count)} emiten</span>
+      <span style="margin-left:auto"></span><button class="btn sm" onclick="loadRemoteDate('${r.trade_date}')">⬇️ Muat</button></div>`).join('')}
+  </div>
+  ${S.db==='off'?`<div class="warn">🟡 <b>Mode lokal:</b> database belum tersambung — data hanya tersimpan di sesi ini.
+    Agar menumpuk permanen, selesaikan setup Cloudflare Pages + D1 sesuai README, lalu refresh halaman ini.</div>`:''}`;
+  const drop=document.getElementById('drop'),fi=document.getElementById('file');
+  drop.onclick=()=>fi.click();
+  ['dragover','dragenter'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.add('over');}));
+  ['dragleave','drop'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.remove('over');}));
+  drop.addEventListener('drop',ev=>{if(ev.dataTransfer.files[0])handleFile(ev.dataTransfer.files[0]);});
+  fi.addEventListener('change',()=>{if(fi.files[0])handleFile(fi.files[0]);fi.value='';});
+}
+async function handleFile(f){
+  const msg=document.getElementById('upmsg'),prev=document.getElementById('upprev');
+  msg.innerHTML='<p class="small mut">⏳ Membaca file…</p>';prev.innerHTML='';
+  try{
+    if(typeof XLSX==='undefined')throw new Error('Pustaka pembaca Excel (SheetJS CDN) belum termuat — periksa koneksi internet lalu refresh.');
+    const buf=await f.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array',cellDates:true});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const arr=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+    const {rows,date,errors,warns}=normalizeFromArrays(arr);
+    if(errors.length){msg.innerHTML=`<div class="err">❌ ${esc(errors[0])}</div>`;return;}
+    if(!rows.length){msg.innerHTML='<div class="err">❌ Tidak ada baris emiten terbaca.</div>';return;}
+    S.pending={rows,date:date||'',file:f.name,warns};
+    const dup=date&&S.days[date];
+    msg.innerHTML=`${warns.map(w=>`<div class="warn">⚠️ ${esc(w)}</div>`).join('')}
+      ${dup?`<div class="warn">⚠️ Tanggal <b>${fmtDateID(date)}</b> sudah ada — simpan akan <b>menimpa</b> data tanggal itu (tidak dobel).</div>`:''}`;
+    prev.innerHTML=`<div class="card" style="margin:10px 0 0"><h3>Pratinjau: ${esc(f.name)}</h3>
+      <div class="toolbar"><div><label class="f">Tanggal perdagangan</label>
+        <input type="date" id="pdate" value="${date||''}" style="min-width:170px"></div>
+        <div><label class="f">Emiten terbaca</label><div style="font-size:20px;font-weight:800">${fmtN(rows.length)}</div></div></div>
+      <div class="tblwrap"><table class="tbl compact"><tr><th class="l">Kode</th><th class="l">Nama</th><th>O</th><th>H</th><th>L</th><th>C</th><th>Nilai</th><th>NetF</th></tr>
+      ${rows.slice(0,8).map(r=>{enrich(r);return `<tr><td class="l"><b>${esc(r.code)}</b></td><td class="l">${esc((r.name||'').slice(0,26))}</td>
+        <td>${fmtN(r.open)}</td><td>${fmtN(r.high)}</td><td>${fmtN(r.low)}</td><td><b>${fmtN(r.close)}</b></td>
+        <td>${fmtShort(r.val)}</td><td class="${cls(r._netf)}">${fmtShort(r._netf)}</td></tr>`;}).join('')}</table></div>
+      <div style="margin-top:10px"><div class="prog"><div id="pbar"></div></div><p class="small mut" id="pstat"></p></div>
+      <div class="btnrow"><button class="btn grn block" onclick="savePending()">💾 Simpan${S.db==='on'?' ke Database':''}</button></div></div>`;
+  }catch(e){msg.innerHTML=`<div class="err">❌ ${esc(e.message)}</div>`;}
+}
+async function savePending(){
+  const p=S.pending;if(!p)return;
+  const dt=(document.getElementById('pdate')||{}).value||p.date;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(dt)){document.getElementById('upmsg').innerHTML='<div class="err">❌ Isi tanggal perdagangan yang valid (YYYY-MM-DD).</div>';return;}
+  const bar=document.getElementById('pbar'),st=document.getElementById('pstat');
+  try{
+    if(S.db==='on'){
+      const BS=250;let done=0;
+      for(let i=0;i<p.rows.length;i+=BS){
+        st.textContent=`Mengunggah ${Math.min(i+BS,p.rows.length)} / ${p.rows.length}…`;
+        const res=await api('/api/upload',{method:'POST',body:JSON.stringify({trade_date:dt,rows:p.rows.slice(i,i+BS)})});
+        if(!res.ok)throw new Error(res.error||'gagal batch');
+        done=Math.min(i+BS,p.rows.length);bar.style.width=(done/p.rows.length*100)+'%';
+      }
+      await api('/api/upload-complete',{method:'POST',body:JSON.stringify({trade_date:dt,row_count:p.rows.length,source_file:p.file})});
+      st.textContent='✅ Tersimpan di database.';
+    }
+    S.days[dt]={rows:p.rows,source:p.file+(S.db==='on'?'':' (lokal)')};
+    S.remote=S.remote.filter(r=>r.trade_date!==dt);
+    S.active=dt;S.pending=null;S.page=0;
+    setTimeout(()=>{setTab('dash');},700);
+  }catch(e){st.innerHTML=`<span class="neg">❌ ${esc(e.message)} — data tetap disimpan lokal sesi ini.</span>`;
+    S.days[dt]={rows:p.rows,source:p.file+' (lokal-gagal server)'};S.active=dt;S.pending=null;}
+}
+async function delDate(d){
+  if(!confirm(`Hapus tanggal ${fmtDateID(d)}?`))return;
+  delete S.days[d];
+  if(S.db==='on'){try{await api('/api/date?date='+d,{method:'DELETE'});}catch(e){alert('Gagal hapus di server: '+e.message);}}
+  if(S.active===d)S.active=null;
+  render();
+}
+
+/* ---------- 13. DATABASE: MUAT DATA ---------- */
+async function checkDb(){
+  try{
+    const r=await api('/api/dates');
+    if(r.ok){S.db='on';await refreshRemote(false);return;}
+    S.db='off';
+  }catch(e){S.db='off';}
+  render();
+}
+async function refreshRemote(loadAll){
+  try{
+    const r=await api('/api/dates');
+    const list=(r.data||[]).map(x=>x.trade_date).sort();
+    const have=new Set(orderDates());
+    S.remote=list.filter(d=>!have.has(d)).map(d=>({trade_date:d,row_count:(r.data.find(x=>x.trade_date===d)||{}).row_count}));
+    const want=loadAll?[...S.remote]:S.remote.slice(-5);
+    if(want.length){
+      const ds=want.map(x=>x.trade_date).sort();
+      const b=await api(`/api/bars?from=${ds[0]}&to=${ds[ds.length-1]}`);
+      if(b.ok)Object.assign(S.days,b.data||{});
+      const now=new Set(orderDates());
+      S.remote=S.remote.filter(x=>!now.has(x.trade_date));
+    }
+  }catch(e){S.db='off';}
+  render();
+}
+async function loadRemoteDate(d){
+  try{const b=await api('/api/bars?date='+d);
+    if(b.ok&&b.data[d]){S.days[d]=b.data[d];S.remote=S.remote.filter(x=>x.trade_date!==d);S.active=d;}
+  }catch(e){alert('Gagal memuat: '+e.message);}
+  render();
+}
+function loadDemo(){
+  Object.assign(S.days,buildDemo());
+  S.active=DEMO_DATES[DEMO_DATES.length-1];S.page=0;
+  setTab('dash');
+}
+
+/* ---------- 14. EXPORT CSV ---------- */
+function dl(name,text){
+  const b=new Blob(["\uFEFF"+text],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+function exportCSV(kind,dt){
+  const d=dt||S.active;if(!d||!S.days[d])return;
+  if(kind==='data'){
+    const rows=S.days[d].rows.map(enrich);
+    const H=['Kode','Nama','Prev','Open','High','Low','Close','Selisih','%Chg','Gap%','Volume','Nilai','Frekuensi','PP','S1','R1','C>PP','L<PP','FBuy','FSell','NetF','BlokFreq'];
+    const L=rows.map(r=>[r.code,`"${(r.name||'').replace(/"/g,'""')}"`,r.prev,r.open,r.high,r.low,r.close,r.chg,
+      r._pct==null?'':r._pct.toFixed(2),r._gap==null?'':r._gap.toFixed(2),r.vol,r.val,r.freq,
+      r._pp==null?'':r._pp.toFixed(2),r._s1==null?'':r._s1.toFixed(2),r._r1==null?'':r._r1.toFixed(2),
+      r._upPP?'YA':'',r._lwPP?'YA':'',r.fbuy,r.fsell,r._netf,r.nrFreq].join(';'));
+    dl(`ringkasan_${d}.csv`,H.join(';')+'\n'+L.join('\n'));
+  }else{
+    const res=runRule(S.rule,d);
+    const H=['Kode','Nama','Close','Selisih','%Chg','Nilai','NetF','NEXT_Tgl','NEXT_Close','NEXT_%','NEXT_Ket','FREK'];
+    const L=res.map(r=>{const n=nextInfo(r.code,d);const f=freqOf(S.rule,r.code,d);
+      return [r.code,`"${(r.name||'').replace(/"/g,'""')}"`,r.close,r.chg,r._pct==null?'':r._pct.toFixed(2),r.val,r._netf,
+        n&&!n.none?n.date:'',n&&!n.none?n.close:'',n&&!n.none?n.pct.toFixed(2):'',n&&!n.none?n.label:'',f.n+'/'+f.of].join(';');});
+    dl(`screener_${S.rule}_${d}.csv`,H.join(';')+'\n'+L.join('\n'));
+  }
+}
+
+/* ---------- 15. INIT ---------- */
+function init(){
+  document.querySelectorAll('#tabs button').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
+  document.getElementById('dateSel').addEventListener('change',e=>{S.active=e.target.value;S.page=0;render();});
+  document.getElementById('prevDate').addEventListener('click',()=>{const o=orderDates();const i=o.indexOf(S.active);if(i>0){S.active=o[i-1];S.page=0;render();}});
+  document.getElementById('nextDate').addEventListener('click',()=>{const o=orderDates();const i=o.indexOf(S.active);if(i>=0&&i<o.length-1){S.active=o[i+1];S.page=0;render();}});
+  document.getElementById('overlay').addEventListener('click',e=>{if(e.target.id==='overlay')closeDetail();});
+  render();
+  checkDb();
+}
+if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',init);
+if(typeof module!=='undefined'&&module.exports)module.exports={parseNum,parseIdxDate,normalizeFromArrays,enrich,RULES,runRule,nextInfo,freqOf,buildDemo,DEMO_DATES,S};
+</script>
+</body>
+</html>
